@@ -136,3 +136,10 @@ namespace AudioRecorder
   <package id="NAudio.Lame" version="1.0.2" targetFramework="net45" />
 </packages>
 
+Install-Package CSCore -Version 1.0.0    -Source nuget.org
+Install-Package NAudio -Version 1.7    -Source nuget.org
+Install-Package NAudio.Lame -Version 1.0.2    -Source nuget.org
+
+
+
+
