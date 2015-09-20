@@ -1,13 +1,14 @@
-using System.Runtime.InteropServices;
 using CSCore;
 using CSCore.Codecs;
 using CSCore.Codecs.WAV;
-using CSCore.MediaFoundation;
 using CSCore.SoundIn;
 using NAudio.Lame;
+using NAudio.Wave;
 using System;
 using System.IO;
 using System.Windows.Forms;
+using MediaFoundationEncoder = CSCore.MediaFoundation.MediaFoundationEncoder;
+using WasapiLoopbackCapture = CSCore.SoundIn.WasapiLoopbackCapture;
 
 namespace AudioRecorder
 {
@@ -31,8 +32,7 @@ namespace AudioRecorder
             _capture.Start();
         }
 
-       
-        public  void CutAnMp3File()
+        public void CutAnMp3File()
         {
             var startTimeSpan = TimeSpan.FromSeconds(20);
             var endTimeSpan = TimeSpan.FromSeconds(50);
@@ -61,16 +61,14 @@ namespace AudioRecorder
             }
         }
 
-        static void ConsoleRecord()
+        private static void ConsoleRecord()
         {
             using (WasapiCapture capture = new WasapiLoopbackCapture())
             {
-
                 capture.Initialize();
 
                 using (var w = new WaveWriter(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\" + "dump.wav", capture.WaveFormat))
                 {
-
                     capture.DataAvailable += (s, ee) => w.Write(ee.Data, ee.Offset, ee.ByteCount);
                     capture.Start();
                     Console.ReadKey();
@@ -95,7 +93,7 @@ namespace AudioRecorder
             using (var writer = new LameMP3FileWriter(mp3FileName, reader.WaveFormat, bitRate))
                 reader.CopyTo(writer);
         }
-      
+
         public static void Mp3ToWave(string mp3FileName, string waveFileName)
         {
             using (var reader = new NAudio.Wave.Mp3FileReader(mp3FileName))
@@ -124,9 +122,92 @@ namespace AudioRecorder
         {
             CutAnMp3File();
         }
+
+        public NAudio.Wave.WaveIn waveSource = null;
+        public NAudio.Wave.WaveFileWriter waveFile = null;
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            waveSource = new NAudio.Wave.WaveIn { WaveFormat = new NAudio.Wave.WaveFormat(44100, 1) };
+
+            waveSource.DataAvailable += waveSource_DataAvailable;
+            waveSource.RecordingStopped += waveSource_RecordingStopped;
+
+            waveFile = new WaveFileWriter(_file + "_recordings.wav", waveSource.WaveFormat);
+
+            waveSource.StartRecording();
+        }
+
+        private decimal intCounter = 0;
+
+        private void waveSource_DataAvailable(object sender, NAudio.Wave.WaveInEventArgs e)
+        {
+            if (waveFile == null) return;
+
+            var Sum2 = ProcessData(e) * 100;
+
+            // If the Mean-Square is greater than a threshold, set a flag to indicate that noise has happened
+            if (Sum2 > AudioThresh)
+            {
+                intCounter++;
+                label1.Text = Sum2.ToString() + "__yeah_" + intCounter;
+                //waveFile.Write(e.Buffer, 0, e.BytesRecorded);
+                //waveFile.Flush();
+            }
+            else
+            {
+                label1.Text = Sum2.ToString() + "_no_sound";
+            }
+
+            waveFile.Write(e.Buffer, 0, e.BytesRecorded);
+            waveFile.Flush();
+        }
+
+        private void waveSource_RecordingStopped(object sender, NAudio.Wave.StoppedEventArgs e)
+        {
+            if (waveSource != null)
+            {
+                waveSource.Dispose();
+                waveSource = null;
+            }
+
+            if (waveFile != null)
+            {
+                waveFile.Dispose();
+                waveFile = null;
+            }
+        }
+
+        private void button6_Click(object sender, EventArgs e)
+        {
+            waveSource.StopRecording();
+        }
+
+        //calculate the sound level based on the AudioThresh
+        private double ProcessData(WaveInEventArgs e)
+        {
+            bool result = false;
+
+            bool Tr = false;
+            double Sum2 = 0;
+            int Count = e.BytesRecorded / 2;
+            for (int index = 0; index < e.BytesRecorded; index += 2)
+            {
+                double Tmp = (short)((e.Buffer[index + 1] << 8) | e.Buffer[index + 0]);
+                Tmp /= 32768.0;
+                Sum2 += Tmp * Tmp;
+                if (Tmp > AudioThresh)
+                    Tr = true;
+            }
+
+            Sum2 /= Count;
+
+            return Sum2;
+        }
+
+        public double AudioThresh = 5;
     }
 }
-
 
 
 <?xml version="1.0" encoding="utf-8"?>
