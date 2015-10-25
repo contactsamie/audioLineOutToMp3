@@ -204,7 +204,17 @@ namespace AudioRecorder
 
             return Sum2;
         }
-
+        public static void Mp4ToMp3(string waveFileName, string mp3FileName, int bitRate = 128)
+        {
+         
+            using (var reader =  new MediaFoundationReader(waveFileName))
+            using (var writer = new LameMP3FileWriter(mp3FileName, reader.WaveFormat, bitRate))
+                reader.CopyTo(writer);
+        }
+         private void button7_Click(object sender, EventArgs e)
+        {
+            Mp4ToMp3(_file + "\\" + txtFileName.Text + ".mp4", _file + "\\" + txtFileName.Text + ".mp3", 256);
+        }
         public double AudioThresh = 5;
     }
 }
